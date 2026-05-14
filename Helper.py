@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Practical for course 'Reinforcement Learning',
-Leiden University, The Netherlands
-By Thomas Moerland
-"""
+
 
 import pandas as pd
 import numpy as np
@@ -46,7 +42,7 @@ class LearningCurvePlot:
         self.ax.axhline(height,ls='--',c='k',label=label)
 
     def save(self,name='test.png'):
-        ''' name: string for filename of saved figure '''
+        
         self.ax.legend()
         self.fig.savefig(name,dpi=300)
 
@@ -95,6 +91,55 @@ def linear_anneal(t,T,start,final,percentage):
         return final
     else:
         return final + (start - final) * (final_from_T - t)/final_from_T
+
+
+def load_curve(path):
+    df = pd.read_csv(path).sort_values("env_step").reset_index(drop=True)
+    col = "smoothed_return" if "smoothed_return" in df.columns else "return"
+    return df["env_step"].to_numpy(), df[col].to_numpy()
+
+
+def compare_plot():
+    smoothing_window = 9
+
+    Plot = LearningCurvePlot(title='Algorithm Comparison on CartPole-v1')
+    Plot.set_ylim(0, 550)
+    Plot.add_hline(height=500, label='Optimal')
+
+    # baseline from previous assignments
+    if os.path.exists("BaselineDataCartPole.csv"):
+        baseline_df = pd.read_csv("BaselineDataCartPole.csv").sort_values("env_step").reset_index(drop=True)
+        baseline_timesteps = baseline_df["env_step"].to_numpy()
+        baseline_curve = baseline_df["Episode_Return"].to_numpy()
+
+        target_steps = np.arange(20000, 960001, 10000)
+        mask = np.isin(baseline_timesteps, target_steps)
+        baseline_eval_timesteps = baseline_timesteps[mask]
+        baseline_learning_curve = baseline_curve[mask]
+        baseline_learning_curve = smooth(baseline_learning_curve, smoothing_window)
+        baseline_learning_curve = np.clip(baseline_learning_curve, 0, 500)
+
+        Plot.add_curve(baseline_eval_timesteps, baseline_learning_curve, label='Baseline', color='black', linestyle='--', linewidth=1.1)
+
+    # previous algorithms to compare results
+    files = [
+        ("compare_results/Naive_DQN_best_param.csv", "Naive DQN"),
+        ("compare_results/REINFORCE.csv", "REINFORCE"),
+        ("compare_results/AC.csv", "AC"),
+        ("compare_results/A2C.csv", "A2C"),
+    ]
+    for path, label in files:
+        if os.path.exists(path):
+            x, y = load_curve(path)
+            Plot.add_curve(x, y, label=label)
+
+    # PPO from current run
+    if os.path.exists("exp_run_results/PPO.csv"):
+        x, y = load_curve("exp_run_results/PPO.csv")
+        Plot.add_curve(x, y, label='PPO')
+
+    Plot.save('PPO_comparison.png')
+
 
 if __name__ == '__main__':
     # Test Learning curve plot
